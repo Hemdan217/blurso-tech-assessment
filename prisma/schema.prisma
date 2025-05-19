@@ -10,50 +10,114 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum TaskStatus {
+  PENDING
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  password      String?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employee    Employee?
+  taskActions TaskAction[]
+
+  @@index([email])
 }
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
+model Employee {
+  id             String   @id @default(cuid())
+  employeeId     String   @unique
+  employmentDate DateTime
+  basicSalary    Int
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String  @unique
+  user      User    @relation(fields: [userId], references: [id])
+  salaries  Salary[]
+  tasks     Task[]
 
-  @@unique([provider, providerAccountId])
+  @@index([employeeId])
+  @@index([userId])
 }
 
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Salary {
+  id          String   @id @default(cuid())
+  employeeId  String
+  month       DateTime
+  baseSalary  Int
+  payable     Int
+  changes     Json     // Array of { value: number, type: "DEDUCTION" | "BONUS", note: string }
+  createdAt   DateTime @default(now())
+
+  employee    Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+  @@index([month])
 }
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
+model Project {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
 
-  @@unique([identifier, token])
+  tasks     Task[]
+
+  @@index([name])
+}
+
+model Task {
+  id           String       @id @default(cuid())
+  title        String
+  description  String
+  status       TaskStatus   @default(PENDING)
+  priority     TaskPriority @default(MEDIUM)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  assignedToId String
+  projectId    String
+  employee     Employee     @relation(fields: [assignedToId], references: [id])
+  project      Project      @relation(fields: [projectId], references: [id])
+  actions      TaskAction[]
+
+  @@index([assignedToId])
+  @@index([projectId])
+  @@index([status])
+  @@index([priority])
+}
+
+model TaskAction {
+  id          String   @id @default(cuid())
+  description String
+  createdAt   DateTime @default(now())
+
+  taskId      String
+  userId      String
+  task        Task     @relation(fields: [taskId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([taskId])
+  @@index([userId])
 }
