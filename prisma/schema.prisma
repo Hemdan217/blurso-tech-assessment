@@ -17,9 +17,8 @@ enum Role {
 
 enum TaskStatus {
   PENDING
-  PLANNING
   IN_PROGRESS
-  COMPLETED
+  DONE
 }
 
 enum TaskPriority {
@@ -27,6 +26,13 @@ enum TaskPriority {
   MEDIUM
   HIGH
   URGENT
+}
+
+enum NotificationType {
+  TASK_ASSIGNMENT
+  TASK_UPDATE
+  STATUS_CHANGE
+  GENERAL
 }
 
 model User {
@@ -38,8 +44,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  employee    Employee?
-  taskActions TaskAction[]
+  employee      Employee?
+  taskActions   TaskAction[]
+  notifications Notification[]
 
   @@index([email])
 }
@@ -69,6 +76,7 @@ model Salary {
   baseSalary  Int
   payable     Int
   changes     Json     // Array of { value: number, type: "DEDUCTION" | "BONUS", note: string }
+  isPaid      Boolean  @default(false)
   createdAt   DateTime @default(now())
 
   employee    Employee @relation(fields: [employeeId], references: [id])
@@ -78,9 +86,12 @@ model Salary {
 }
 
 model Project {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   tasks     Task[]
 
@@ -88,29 +99,31 @@ model Project {
 }
 
 model Task {
-  id           String       @id @default(cuid())
+  id           String     @id @default(cuid())
   title        String
-  description  String
-  status       TaskStatus   @default(PENDING)
-  priority     TaskPriority @default(MEDIUM)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  description  String?
+  status       TaskStatus @default(PENDING)
+  dueDate      DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   assignedToId String
   projectId    String
-  employee     Employee     @relation(fields: [assignedToId], references: [id])
-  project      Project      @relation(fields: [projectId], references: [id])
+  employee     Employee   @relation(fields: [assignedToId], references: [id])
+  project      Project    @relation(fields: [projectId], references: [id])
   actions      TaskAction[]
 
   @@index([assignedToId])
   @@index([projectId])
   @@index([status])
-  @@index([priority])
 }
 
 model TaskAction {
   id          String   @id @default(cuid())
   description String
+  note        String?
+  oldStatus   TaskStatus?
+  newStatus   TaskStatus?
   createdAt   DateTime @default(now())
 
   taskId      String
@@ -120,4 +133,20 @@ model TaskAction {
 
   @@index([taskId])
   @@index([userId])
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  title       String
+  message     String
+  type        NotificationType
+  link        String
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  recipientId String
+  recipient   User             @relation(fields: [recipientId], references: [id])
+
+  @@index([recipientId])
+  @@index([isRead])
 }

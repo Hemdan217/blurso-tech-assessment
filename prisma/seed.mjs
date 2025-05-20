@@ -9,6 +9,19 @@ const RoleEnum = {
   EMPLOYEE: "EMPLOYEE",
 };
 
+const TaskStatusEnum = {
+  PENDING: "PENDING",
+  IN_PROGRESS: "IN_PROGRESS",
+  DONE: "DONE",
+};
+
+const NotificationTypeEnum = {
+  TASK_ASSIGNMENT: "TASK_ASSIGNMENT",
+  TASK_UPDATE: "TASK_UPDATE",
+  STATUS_CHANGE: "STATUS_CHANGE",
+  GENERAL: "GENERAL",
+};
+
 async function main() {
   try {
     // Create admin user - use upsert to avoid unique constraint errors
@@ -62,6 +75,8 @@ async function main() {
       project = await prisma.project.create({
         data: {
           name: "Website Redesign",
+          description: "Redesign the company website with a modern look and feel",
+          isArchived: false,
         },
       });
     }
@@ -76,19 +91,56 @@ async function main() {
         },
       });
 
+      let task;
       if (!existingTask) {
         // Create a sample task
-        await prisma.task.create({
+        task = await prisma.task.create({
           data: {
             title: "Design Homepage",
             description: "Create new homepage design with modern UI elements",
-            status: "PENDING",
-            priority: "HIGH",
+            status: TaskStatusEnum.PENDING,
+            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Due in 7 days
             assignedToId: employee.employee.id,
             projectId: project.id,
           },
         });
+
+        // Add a task action for the creation
+        await prisma.taskAction.create({
+          data: {
+            taskId: task.id,
+            userId: admin.id,
+            description: "Task created",
+            newStatus: TaskStatusEnum.PENDING,
+          },
+        });
+      } else {
+        task = existingTask;
       }
+
+      // Create a welcome notification for admin
+      await prisma.notification.create({
+        data: {
+          recipientId: admin.id,
+          title: "Welcome to Notifications",
+          message: "You have successfully set up the notification system!",
+          type: NotificationTypeEnum.GENERAL,
+          link: "/dashboard",
+          isRead: false,
+        },
+      });
+
+      // Create a task assignment notification for employee
+      await prisma.notification.create({
+        data: {
+          recipientId: employee.id,
+          title: "New Task Assigned",
+          message: `You've been assigned to a new task: ${task.title}`,
+          type: NotificationTypeEnum.TASK_ASSIGNMENT,
+          link: `/dashboard/tasks?taskId=${task.id}`,
+          isRead: false,
+        },
+      });
     }
 
     console.log("Seed data created or updated successfully");

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Settings, LogOut, Folders } from "lucide-react";
+import { LayoutDashboard, Users, Settings, LogOut, Folders, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOut } from "next-auth/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -33,6 +34,9 @@ function SidebarNavItem({ href, icon, title }: SidebarNavItemProps) {
 }
 
 export function DashboardSidebar() {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
+
   return (
     <div className="hidden w-64 border-r bg-background lg:block">
       <div className="flex h-full max-h-screen flex-col">
@@ -44,10 +48,19 @@ export function DashboardSidebar() {
               title="Overview"
             />
 
+            {isAdmin && (
+              <SidebarNavItem
+                href="/dashboard/employees"
+                icon={<Users className="h-4 w-4" />}
+                title="Employees"
+              />
+            )}
+
+            {/* Salaries link - available to all but with different views based on role */}
             <SidebarNavItem
-              href="/dashboard/employees"
-              icon={<Users className="h-4 w-4" />}
-              title="Employees"
+              href="/dashboard/salaries"
+              icon={<DollarSign className="h-4 w-4" />}
+              title="Salaries"
             />
 
             <SidebarNavItem

@@ -1,31 +1,37 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
-import { DashboardSidebar } from "./sidebar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sidebar } from "@/components/sidebar";
 
-export function MobileSidebar() {
-  const [open, setOpen] = useState(false);
+interface MobileSidebarProps {
+  user: {
+    name?: string | null;
+    email?: string | null;
+    role?: string | null;
+  } | null;
+}
 
+export function MobileSidebar({ user }: MobileSidebarProps) {
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet>
       <SheetTrigger asChild>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
           className="lg:hidden"
         >
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle Menu</span>
+          <span className="sr-only">Toggle menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="p-0 w-[300px]">
-        <div className="h-full flex">
-          <DashboardSidebar />
-        </div>
+      <SheetContent
+        side="left"
+        className="p-0 w-[240px]"
+      >
+        <Sidebar user={user} />
       </SheetContent>
     </Sheet>
   );
-} 
+}

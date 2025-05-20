@@ -1,25 +1,26 @@
-import type { Metadata } from "next";
 import "./globals.css";
-import { Navigation } from "@/components/navigation";
-import { Providers } from "@/components/providers";
+import { Inter } from "next/font/google";
+import { NextAuthProvider } from "@/providers/next-auth-provider";
+import { Toaster } from "@/components/ui/toaster";
 
-export const metadata: Metadata = {
-  title: "Next.js Auth App",
-  description: "A Next.js application with authentication",
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata = {
+  title: "Blurr.so HR Portal",
+  description: "Internal HR portal for Blurr.so",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        <Providers>
-          <Navigation />
-          <main>{children}</main>
-        </Providers>
+    <html
+      lang="en"
+      suppressHydrationWarning
+    >
+      <body className={inter.className}>
+        <NextAuthProvider>
+          {children}
+          <Toaster />
+        </NextAuthProvider>
       </body>
     </html>
   );
