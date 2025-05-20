@@ -15,14 +15,28 @@ import { Calendar, ArrowRight } from "lucide-react";
 import { getMyTasks, updateTaskStatus } from "./actions";
 import { TaskDetailsModal } from "./components/task-details-modal";
 
+// Define Task interface
+interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  status: "PENDING" | "IN_PROGRESS" | "DONE";
+  dueDate: string | null;
+  project: {
+    id: string;
+    name: string;
+  };
+}
+
 export default function MyTasksPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { toast } = useToast();
-  const isEmployee = session?.user?.role === "EMPLOYEE";
+  const isAdmin = session?.user?.role === "ADMIN";
+  const isEmployee = !isAdmin && session?.user?.role === "EMPLOYEE";
 
   // State
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -30,10 +44,10 @@ export default function MyTasksPage() {
 
   // Redirect admins to the dashboard
   useEffect(() => {
-    if (status !== "loading" && session?.user?.role === "ADMIN") {
+    if (status !== "loading" && isAdmin) {
       router.push("/dashboard");
     }
-  }, [status, session, router]);
+  }, [status, isAdmin, router]);
 
   // Load tasks
   const loadData = async () => {
@@ -140,9 +154,6 @@ export default function MyTasksPage() {
 
     return true;
   });
-
-  // Determine if user is an employee
-  const isEmployee = session?.user?.role === "EMPLOYEE";
 
   // Loading state
   if (status === "loading" || loading) {
