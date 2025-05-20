@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import { format } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { Calendar, ArrowRight, MoreHorizontal, CheckCircle2, Circle, Clock, ListFilter } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DropdownMenu,
@@ -18,9 +17,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getMyTasks, updateTaskStatus } from "./actions";
+import {
+  Calendar,
+  ArrowRight,
+  MoreHorizontal,
+  CheckCircle2,
+  Circle,
+  Clock,
+  ListFilter,
+  User,
+  Search,
+} from "lucide-react";
+import { getAllTasks, updateTaskStatus } from "./actions";
 import { TaskDetailsModal } from "./components/task-details-modal";
-import AdminTasksBoard from "./admin-board";
 
 // Define Task interface
 interface Task {
@@ -32,6 +41,14 @@ interface Task {
   project: {
     id: string;
     name: string;
+  };
+  employee: {
+    id: string;
+    user: {
+      id: string;
+      name: string;
+      email: string;
+    };
   };
   actions?: Array<{
     id: string;
@@ -78,36 +95,7 @@ const statusConfig = {
   },
 };
 
-export default function TasksPage() {
-  const { data: session, status } = useSession();
-
-  // Loading state
-  if (status === "loading") {
-    return (
-      <div className="flex items-center justify-center w-full p-8">
-        <div className="text-center space-y-4">
-          <Spinner
-            size="lg"
-            variant="primary"
-          />
-          <p className="text-primary animate-pulse-fade">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // For admin users, render the admin tasks board
-  if (session?.user?.role === "ADMIN") {
-    return <AdminTasksBoard />;
-  }
-
-  // For employees, render their tasks
-  return <EmployeeTasks />;
-}
-
-// Employee Tasks component
-function EmployeeTasks() {
-  const { data: session, status } = useSession();
+export default function AdminTasksBoard() {
   const { toast } = useToast();
 
   // State
@@ -115,21 +103,22 @@ function EmployeeTasks() {
   const [loading, setLoading] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [dueDateFilter, setDueDateFilter] = useState<string>("all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [employeeFilter, setEmployeeFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortOption, setSortOption] = useState<string>("dueDate");
-
-  // Redirect admins to the dashboard
-  useEffect(() => {
-    if (status !== "loading" && session?.user?.role === "ADMIN") {
-      window.location.href = "/dashboard";
-    }
-  }, [status]);
+  const [statusCounts, setStatusCounts] = useState({
+    PENDING: 0,
+    IN_PROGRESS: 0,
+    DONE: 0,
+  });
 
   // Load tasks
   const loadData = async () => {
     try {
       setLoading(true);
-      const result = await getMyTasks();
+      const result = await getAllTasks();
+
       // Convert Date objects to strings for compatibility with our Task interface
       const formattedTasks = result.tasks.map(
         (task: {
@@ -141,6 +130,14 @@ function EmployeeTasks() {
           project: {
             id: string;
             name: string;
+          };
+          employee: {
+            id: string;
+            user: {
+              id: string;
+              name: string;
+              email: string;
+            };
           };
           actions?: Array<{
             id: string;
@@ -163,7 +160,9 @@ function EmployeeTasks() {
           })),
         }),
       );
+
       setTasks(formattedTasks);
+      setStatusCounts(result.statusCounts);
     } catch (error) {
       console.error("Error loading tasks:", error);
       toast({
@@ -178,10 +177,8 @@ function EmployeeTasks() {
 
   // Initial data load
   useEffect(() => {
-    if (status !== "loading") {
-      loadData();
-    }
-  }, [status]);
+    loadData();
+  }, []);
 
   // Handle task status update
   const handleStatusUpdate = async (taskId: string, newStatus: "PENDING" | "IN_PROGRESS" | "DONE") => {
@@ -219,6 +216,28 @@ function EmployeeTasks() {
     setSelectedTaskId(taskId);
   };
 
+  // Get unique projects for filtering
+  const projects = Array.from(new Set(tasks.map((task) => task.project.id)))
+    .map((projectId) => {
+      const task = tasks.find((t) => t.project.id === projectId);
+      return {
+        id: projectId,
+        name: task?.project.name || "",
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Get unique employees for filtering
+  const employees = Array.from(new Set(tasks.map((task) => task.employee.id)))
+    .map((employeeId) => {
+      const task = tasks.find((t) => t.employee.id === employeeId);
+      return {
+        id: employeeId,
+        name: task?.employee.user.name || "",
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   // Filter tasks
   const filteredTasks = tasks.filter((task) => {
     // Filter by status
@@ -226,39 +245,25 @@ function EmployeeTasks() {
       return false;
     }
 
-    // Filter by due date
-    if (dueDateFilter !== "all") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    // Filter by project
+    if (projectFilter !== "all" && task.project.id !== projectFilter) {
+      return false;
+    }
 
-      const taskDueDate = task.dueDate ? new Date(task.dueDate) : null;
+    // Filter by employee
+    if (employeeFilter !== "all" && task.employee.id !== employeeFilter) {
+      return false;
+    }
 
-      if (dueDateFilter === "today") {
-        if (!taskDueDate) return false;
-
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        return taskDueDate >= today && taskDueDate < tomorrow;
-      }
-
-      if (dueDateFilter === "week") {
-        if (!taskDueDate) return false;
-
-        const endOfWeek = new Date(today);
-        endOfWeek.setDate(endOfWeek.getDate() + 7);
-
-        return taskDueDate >= today && taskDueDate < endOfWeek;
-      }
-
-      if (dueDateFilter === "overdue") {
-        if (!taskDueDate) return false;
-        return taskDueDate < today;
-      }
-
-      if (dueDateFilter === "no-due-date") {
-        return !taskDueDate;
-      }
+    // Filter by search query
+    if (searchQuery) {
+      const normalizedQuery = searchQuery.toLowerCase();
+      return (
+        task.title.toLowerCase().includes(normalizedQuery) ||
+        (task.description && task.description.toLowerCase().includes(normalizedQuery)) ||
+        task.project.name.toLowerCase().includes(normalizedQuery) ||
+        task.employee.user.name.toLowerCase().includes(normalizedQuery)
+      );
     }
 
     return true;
@@ -280,6 +285,9 @@ function EmployeeTasks() {
     if (sortOption === "project") {
       return a.project.name.localeCompare(b.project.name);
     }
+    if (sortOption === "employee") {
+      return a.employee.user.name.localeCompare(b.employee.user.name);
+    }
     return 0;
   });
 
@@ -297,7 +305,7 @@ function EmployeeTasks() {
             size="lg"
             variant="primary"
           />
-          <p className="text-primary animate-pulse-fade">Loading your tasks...</p>
+          <p className="text-primary animate-pulse-fade">Loading all tasks...</p>
         </div>
       </div>
     );
@@ -305,16 +313,49 @@ function EmployeeTasks() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">My Tasks</h1>
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <h1 className="text-2xl font-bold">All Tasks</h1>
+
+        <div className="flex items-center gap-3">
+          <Badge
+            variant="outline"
+            className="bg-yellow-100 text-yellow-800 flex items-center gap-1"
+          >
+            <Circle className="w-3 h-3" /> To Do: {statusCounts.PENDING}
+          </Badge>
+          <Badge
+            variant="outline"
+            className="bg-blue-100 text-blue-800 flex items-center gap-1"
+          >
+            <Clock className="w-3 h-3" /> In Progress: {statusCounts.IN_PROGRESS}
+          </Badge>
+          <Badge
+            variant="outline"
+            className="bg-green-100 text-green-800 flex items-center gap-1"
+          >
+            <CheckCircle2 className="w-3 h-3" /> Completed: {statusCounts.DONE}
+          </Badge>
+        </div>
+      </div>
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Your Assigned Tasks</CardTitle>
-          <CardDescription>View and manage all tasks assigned to you</CardDescription>
+          <CardTitle>Task Management</CardTitle>
+          <CardDescription>View and manage all tasks in the system</CardDescription>
         </CardHeader>
         <CardContent>
           {/* Filters */}
-          <div className="flex flex-wrap gap-4 mb-6 items-center">
+          <div className="flex flex-wrap gap-4 mb-6">
+            <div className="relative w-full sm:w-auto flex-1 sm:flex-none">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search tasks..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground whitespace-nowrap">Status:</span>
               <Select
@@ -332,24 +373,53 @@ function EmployeeTasks() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">Due Date:</span>
+              <span className="text-sm text-muted-foreground whitespace-nowrap">Project:</span>
               <Select
-                value={dueDateFilter}
-                onValueChange={setDueDateFilter}
+                value={projectFilter}
+                onValueChange={setProjectFilter}
               >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Filter by due date" />
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by project" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Due Dates</SelectItem>
-                  <SelectItem value="today">Due Today</SelectItem>
-                  <SelectItem value="week">Due This Week</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="no-due-date">No Due Date</SelectItem>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem
+                      key={project.id}
+                      value={project.id}
+                    >
+                      {project.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">Employee:</span>
+              <Select
+                value={employeeFilter}
+                onValueChange={setEmployeeFilter}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Employees</SelectItem>
+                  {employees.map((employee) => (
+                    <SelectItem
+                      key={employee.id}
+                      value={employee.id}
+                    >
+                      {employee.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="flex items-center gap-2 ml-auto">
               <span className="text-sm text-muted-foreground whitespace-nowrap">Sort By:</span>
               <Select
@@ -363,6 +433,7 @@ function EmployeeTasks() {
                   <SelectItem value="dueDate">Due Date</SelectItem>
                   <SelectItem value="title">Title</SelectItem>
                   <SelectItem value="project">Project</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -466,6 +537,10 @@ function EmployeeTasks() {
                                         <span className="inline-block w-2 h-2 rounded-full bg-primary mr-1.5"></span>
                                         <span className="truncate">{task.project.name}</span>
                                       </div>
+                                      <div className="text-xs text-muted-foreground flex items-center">
+                                        <User className="h-3 w-3 mr-1" />
+                                        <span className="truncate">{task.employee.user.name}</span>
+                                      </div>
 
                                       {task.dueDate && (
                                         <div
@@ -536,9 +611,10 @@ function EmployeeTasks() {
                   <Table>
                     <TableHeader className="bg-muted/50">
                       <TableRow>
-                        <TableHead className="w-[40%]">Task</TableHead>
-                        <TableHead className="w-[15%]">Status</TableHead>
+                        <TableHead className="w-[30%]">Task</TableHead>
+                        <TableHead className="w-[10%]">Status</TableHead>
                         <TableHead className="w-[15%]">Project</TableHead>
+                        <TableHead className="w-[15%]">Employee</TableHead>
                         <TableHead className="w-[15%]">Due Date</TableHead>
                         <TableHead className="w-[15%] text-right">Actions</TableHead>
                       </TableRow>
@@ -586,6 +662,12 @@ function EmployeeTasks() {
                               <div className="flex items-center">
                                 <span className="inline-block w-2 h-2 rounded-full bg-primary mr-1.5"></span>
                                 <span className="text-sm truncate block max-w-[120px]">{task.project.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                <User className="h-3 w-3 mr-1.5 text-muted-foreground" />
+                                <span className="text-sm truncate block max-w-[120px]">{task.employee.user.name}</span>
                               </div>
                             </TableCell>
                             <TableCell>

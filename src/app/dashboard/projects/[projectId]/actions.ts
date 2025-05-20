@@ -39,7 +39,7 @@ export async function createTask(data: CreateTaskData) {
       data: {
         title: parsedData.title,
         description: parsedData.description,
-        dueDate: parsedData.dueDate,
+        dueDate: parsedData.dueDate ? new Date(parsedData.dueDate) : null,
         assignedToId: parsedData.assignedToId,
         projectId: parsedData.projectId,
         status: "PENDING",
@@ -114,7 +114,7 @@ export async function updateTask(data: UpdateTaskData) {
       data: {
         title: parsedData.title,
         description: parsedData.description,
-        dueDate: parsedData.dueDate,
+        dueDate: parsedData.dueDate ? new Date(parsedData.dueDate) : null,
       },
     });
 

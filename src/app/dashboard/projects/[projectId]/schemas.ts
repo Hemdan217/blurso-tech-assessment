@@ -10,7 +10,9 @@ export const createTaskSchema = z.object({
   dueDate: z
     .string()
     .optional()
-    .transform((val) => (val ? new Date(val) : undefined)),
+    .refine((val) => !val || !isNaN(new Date(val).getTime()), {
+      message: "Invalid date format",
+    }),
   assignedToId: z.string({
     required_error: "Please select an employee",
   }),
@@ -28,7 +30,9 @@ export const updateTaskSchema = z.object({
   dueDate: z
     .string()
     .optional()
-    .transform((val) => (val ? new Date(val) : undefined)),
+    .refine((val) => !val || !isNaN(new Date(val).getTime()), {
+      message: "Invalid date format",
+    }),
 });
 
 // Schema for updating task status

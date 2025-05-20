@@ -12,6 +12,7 @@ import { Calendar, Clock, MessageCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { getTaskDetails, updateTaskStatus, addTaskNote } from "../actions";
 import { useSession } from "next-auth/react";
 
@@ -156,6 +157,11 @@ export function TaskDetailsModal({ taskId, onClose, onStatusUpdate }: TaskDetail
               size="md"
               variant="primary"
             />
+            <DialogHeader>
+              <VisuallyHidden>
+                <DialogTitle>Loading Task Details</DialogTitle>
+              </VisuallyHidden>
+            </DialogHeader>
           </div>
         ) : (
           <>

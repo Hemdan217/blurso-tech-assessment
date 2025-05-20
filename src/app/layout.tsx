@@ -2,6 +2,7 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import { NextAuthProvider } from "@/providers/next-auth-provider";
 import { Toaster } from "@/components/ui/toaster";
+import { Chatbot } from "@/components/chatbot";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <NextAuthProvider>
           {children}
           <Toaster />
+          <Chatbot />
         </NextAuthProvider>
       </body>
     </html>

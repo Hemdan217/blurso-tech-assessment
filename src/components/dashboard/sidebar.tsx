@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Settings, LogOut, Folders, DollarSign } from "lucide-react";
+import { LayoutDashboard, Users, Settings, LogOut, Folders, DollarSign, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOut } from "next-auth/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,7 +17,7 @@ interface SidebarNavItemProps {
 
 function SidebarNavItem({ href, icon, title }: SidebarNavItemProps) {
   const pathname = usePathname();
-  const isActive = pathname === href;
+  const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));
 
   return (
     <Link
@@ -63,11 +63,21 @@ export function DashboardSidebar() {
               title="Salaries"
             />
 
+            {/* Tasks link - available to all users */}
             <SidebarNavItem
-              href="/dashboard/projects"
-              icon={<Folders className="h-4 w-4" />}
-              title="Projects"
+              href="/dashboard/tasks"
+              icon={<ListTodo className="h-4 w-4" />}
+              title="Tasks"
             />
+
+            {/* Projects link - only visible to admin users */}
+            {isAdmin && (
+              <SidebarNavItem
+                href="/dashboard/projects"
+                icon={<Folders className="h-4 w-4" />}
+                title="Projects"
+              />
+            )}
 
             <div className="mt-4 text-xs font-medium uppercase text-muted-foreground">Settings</div>
             <SidebarNavItem

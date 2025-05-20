@@ -13,6 +13,7 @@ import {
   CreditCard,
   UserCircle,
   Menu,
+  ListTodo,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOut } from "next-auth/react";
@@ -36,7 +37,7 @@ interface SidebarNavItemProps {
 
 function SidebarNavItem({ href, icon, title }: SidebarNavItemProps) {
   const pathname = usePathname();
-  const isActive = pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));
 
   return (
     <Link
@@ -101,10 +102,18 @@ export function Sidebar({ user }: SidebarProps) {
           />
 
           <SidebarNavItem
-            href="/dashboard/projects"
-            icon={<Folder className="h-4 w-4" />}
-            title={isCollapsed ? "" : "Projects"}
+            href="/dashboard/tasks"
+            icon={<ListTodo className="h-4 w-4" />}
+            title={isCollapsed ? "" : "Tasks"}
           />
+
+          {isAdmin && (
+            <SidebarNavItem
+              href="/dashboard/projects"
+              icon={<Folder className="h-4 w-4" />}
+              title={isCollapsed ? "" : "Projects"}
+            />
+          )}
 
           <SidebarNavItem
             href="/dashboard/profile"
