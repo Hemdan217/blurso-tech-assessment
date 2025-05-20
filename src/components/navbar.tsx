@@ -14,11 +14,18 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, User } from "lucide-react";
 import { NotificationsWrapper } from "@/components/notifications/notifications-wrapper";
+import { Spinner } from "@/components/ui/spinner";
+import { useEffect, useState } from "react";
 
 export function Navbar() {
   const { data: session, status } = useSession();
   const pathname = usePathname();
-  const isAuthenticated = status === "authenticated";
+  const [mounted, setMounted] = useState(false);
+
+  // Only show auth content after component is mounted on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const getInitials = (name: string) => {
     return name
@@ -32,8 +39,12 @@ export function Navbar() {
     signOut({ callbackUrl: "/" });
   };
 
+  // Authenticated state is only valid after mounting on client
+  const isAuthenticated = mounted && status === "authenticated";
+  const isLoading = mounted && status === "loading";
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background">
+    <header className="sticky top-0 z-40 w-full border-b bg-background px-10">
       <div className="container flex h-16 items-center justify-between py-4">
         <div className="flex items-center gap-2">
           <Link
@@ -45,7 +56,18 @@ export function Navbar() {
         </div>
 
         <nav className="flex items-center gap-4">
-          {isAuthenticated ? (
+          {/* Authentication-dependent UI */}
+          {!mounted ? (
+            // Show placeholder during SSR and initial render
+            <div className="flex items-center h-8 w-8"></div>
+          ) : isLoading ? (
+            <div className="flex items-center">
+              <Spinner
+                size="sm"
+                className="text-primary"
+              />
+            </div>
+          ) : isAuthenticated ? (
             <>
               <div className="hidden md:flex items-center gap-6">
                 <Link
@@ -67,7 +89,7 @@ export function Navbar() {
               </div>
 
               {/* Notifications */}
-              {isAuthenticated && <NotificationsWrapper />}
+              <NotificationsWrapper />
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

@@ -311,3 +311,66 @@ export async function getTaskDetails(taskId: string) {
     throw error;
   }
 }
+
+// Get all tasks (for admin users)
+export async function getAllTasks() {
+  try {
+    const session = await auth();
+
+    // Check if user is authenticated
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+
+    // Verify user is an admin
+    if (session.user.role !== "ADMIN") {
+      throw new Error("Only admin users can view all tasks");
+    }
+
+    // Get all tasks with their project and assigned employee details
+    const tasks = await prisma.task.findMany({
+      include: {
+        project: true,
+        employee: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+        actions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ status: "asc" }, { dueDate: "asc" }, { updatedAt: "desc" }],
+    });
+
+    // Count tasks by status
+    const statusCounts = {
+      PENDING: tasks.filter((task) => task.status === "PENDING").length,
+      IN_PROGRESS: tasks.filter((task) => task.status === "IN_PROGRESS").length,
+      DONE: tasks.filter((task) => task.status === "DONE").length,
+    };
+
+    return {
+      tasks,
+      statusCounts,
+    };
+  } catch (error) {
+    console.error("Error fetching all tasks:", error);
+    throw error;
+  }
+}

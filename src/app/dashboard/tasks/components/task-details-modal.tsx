@@ -8,10 +8,21 @@ import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Calendar, Clock, MessageCircle, ArrowRight } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  MessageCircle,
+  ArrowRight,
+  CheckCircle,
+  Circle,
+  RotateCw,
+  History,
+  Printer,
+} from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { getTaskDetails, updateTaskStatus, addTaskNote } from "../actions";
 import { useSession } from "next-auth/react";
 
@@ -21,17 +32,102 @@ interface TaskDetailsModalProps {
   onStatusUpdate: () => void;
 }
 
+// Define types for task and action
+interface TaskAction {
+  id: string;
+  description: string;
+  note: string | null;
+  oldStatus: "PENDING" | "IN_PROGRESS" | "DONE" | null;
+  newStatus: "PENDING" | "IN_PROGRESS" | "DONE" | null;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+  };
+}
+
+// Define an interface for the raw task action from the API
+interface RawTaskAction {
+  id: string;
+  description: string;
+  note: string | null;
+  oldStatus: "PENDING" | "IN_PROGRESS" | "DONE" | null;
+  newStatus: "PENDING" | "IN_PROGRESS" | "DONE" | null;
+  createdAt: Date;
+  user: {
+    id: string;
+    name: string;
+  };
+}
+
+interface TaskDetails {
+  id: string;
+  title: string;
+  description: string | null;
+  status: "PENDING" | "IN_PROGRESS" | "DONE";
+  dueDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  project: {
+    id: string;
+    name: string;
+  };
+  employee: {
+    id: string;
+    user: {
+      id: string;
+      name: string;
+      email?: string;
+    };
+  };
+  actions: TaskAction[];
+}
+
 export function TaskDetailsModal({ taskId, onClose, onStatusUpdate }: TaskDetailsModalProps) {
   const { data: session } = useSession();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [task, setTask] = useState<any>(null);
+  const [task, setTask] = useState<TaskDetails | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [noteLoading, setNoteLoading] = useState(false);
 
-  const isAdmin = session?.user?.role === "ADMIN";
   const isAssignedUser = task?.employee?.user?.id === session?.user?.id;
+
+  // Helper function to format task data with proper string dates
+  const formatTaskData = (taskData: {
+    id: string;
+    title: string;
+    description: string | null;
+    status: "PENDING" | "IN_PROGRESS" | "DONE";
+    dueDate: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    project: {
+      id: string;
+      name: string;
+    };
+    employee: {
+      id: string;
+      user: {
+        id: string;
+        name: string;
+        email?: string;
+      };
+    };
+    actions: RawTaskAction[];
+  }): TaskDetails => {
+    return {
+      ...taskData,
+      dueDate: taskData.dueDate ? taskData.dueDate.toString() : null,
+      createdAt: taskData.createdAt.toString(),
+      updatedAt: taskData.updatedAt.toString(),
+      actions: taskData.actions.map((action: RawTaskAction) => ({
+        ...action,
+        createdAt: action.createdAt.toString(),
+      })),
+    };
+  };
 
   // Load task details
   useEffect(() => {
@@ -39,7 +135,7 @@ export function TaskDetailsModal({ taskId, onClose, onStatusUpdate }: TaskDetail
       try {
         setLoading(true);
         const result = await getTaskDetails(taskId);
-        setTask(result.task);
+        setTask(formatTaskData(result.task));
       } catch (error) {
         console.error("Error loading task details:", error);
         toast({
@@ -89,7 +185,7 @@ export function TaskDetailsModal({ taskId, onClose, onStatusUpdate }: TaskDetail
         // Clear note text, refresh task data and notify parent
         setNoteText("");
         const updatedTask = await getTaskDetails(taskId);
-        setTask(updatedTask.task);
+        setTask(formatTaskData(updatedTask.task));
         onStatusUpdate();
       } else {
         toast({
@@ -137,7 +233,7 @@ export function TaskDetailsModal({ taskId, onClose, onStatusUpdate }: TaskDetail
         // Clear note text, refresh task data
         setNoteText("");
         const updatedTask = await getTaskDetails(taskId);
-        setTask(updatedTask.task);
+        setTask(formatTaskData(updatedTask.task));
       } else {
         toast({
           variant: "destructive",
@@ -169,6 +265,11 @@ export function TaskDetailsModal({ taskId, onClose, onStatusUpdate }: TaskDetail
               size="md"
               variant="primary"
             />
+            <DialogHeader>
+              <VisuallyHidden>
+                <DialogTitle>Loading Task Details</DialogTitle>
+              </VisuallyHidden>
+            </DialogHeader>
           </div>
         ) : (
           <>
@@ -222,7 +323,7 @@ export function TaskDetailsModal({ taskId, onClose, onStatusUpdate }: TaskDetail
                     <h3 className="text-sm font-medium mb-1">Created</h3>
                     <div className="flex items-center text-sm text-muted-foreground">
                       <Clock className="h-3 w-3 mr-1" />
-                      <span>{format(new Date(task?.createdAt), "MMM d, yyyy HH:mm")}</span>
+                      <span>{format(new Date(task?.createdAt || Date.now()), "MMM d, yyyy HH:mm")}</span>
                     </div>
                   </div>
                   {task?.dueDate && (
@@ -318,60 +419,234 @@ export function TaskDetailsModal({ taskId, onClose, onStatusUpdate }: TaskDetail
               <TabsContent value="timeline">
                 <Card className="border-none shadow-none">
                   <CardHeader className="px-0 pt-4 pb-2">
-                    <CardTitle className="text-base">Task History</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <History className="mr-2 h-5 w-5 text-primary" />
+                        <CardTitle className="text-base">Task History</CardTitle>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => {
+                          // Create printable version of the timeline
+                          const printContent = document.createElement("div");
+                          printContent.innerHTML = `
+                            <style>
+                              body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.5; padding: 20px; }
+                              h1 { font-size: 18px; margin-bottom: 8px; }
+                              h2 { font-size: 16px; margin-bottom: 16px; color: #666; }
+                              .timeline { margin-top: 20px; }
+                              .action { padding: 12px; border-bottom: 1px solid #eee; page-break-inside: avoid; }
+                              .action-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+                              .action-title { font-weight: 600; }
+                              .action-time { color: #666; font-size: 12px; }
+                              .action-note { background: #f7f7f7; padding: 8px; margin-top: 8px; border-radius: 4px; }
+                              .action-user { font-size: 12px; color: #666; margin-top: 8px; }
+                              .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+                              .badge-todo { background: #fff6db; color: #805d00; }
+                              .badge-progress { background: #e1f0ff; color: #005fb3; }
+                              .badge-done { background: #e6f7e6; color: #008000; }
+                              @media print {
+                                body { padding: 0; }
+                                button { display: none; }
+                              }
+                            </style>
+                            <h1>${task?.title}</h1>
+                            <h2>Project: ${task?.project?.name} - Task History</h2>
+                            <div class="timeline">
+                              ${task?.actions
+                                ?.map(
+                                  (action) => `
+                                <div class="action">
+                                  <div class="action-header">
+                                    <div class="action-title">${action.description}</div>
+                                    <div class="action-time">${format(
+                                      new Date(action.createdAt),
+                                      "MMM d, yyyy HH:mm",
+                                    )}</div>
+                                  </div>
+                                  ${
+                                    action.oldStatus && action.newStatus
+                                      ? `
+                                    <div>
+                                      <span class="badge ${
+                                        action.oldStatus === "PENDING"
+                                          ? "badge-todo"
+                                          : action.oldStatus === "IN_PROGRESS"
+                                          ? "badge-progress"
+                                          : "badge-done"
+                                      }">
+                                        ${
+                                          action.oldStatus === "PENDING"
+                                            ? "To Do"
+                                            : action.oldStatus === "IN_PROGRESS"
+                                            ? "In Progress"
+                                            : "Completed"
+                                        }
+                                      </span>
+                                      →
+                                      <span class="badge ${
+                                        action.newStatus === "PENDING"
+                                          ? "badge-todo"
+                                          : action.newStatus === "IN_PROGRESS"
+                                          ? "badge-progress"
+                                          : "badge-done"
+                                      }">
+                                        ${
+                                          action.newStatus === "PENDING"
+                                            ? "To Do"
+                                            : action.newStatus === "IN_PROGRESS"
+                                            ? "In Progress"
+                                            : "Completed"
+                                        }
+                                      </span>
+                                    </div>
+                                  `
+                                      : ""
+                                  }
+                                  ${action.note ? `<div class="action-note">${action.note}</div>` : ""}
+                                  <div class="action-user">By: ${action.user.name}</div>
+                                </div>
+                              `,
+                                )
+                                .join("")}
+                            </div>
+                          `;
+
+                          // Create a new window and print
+                          const printWindow = window.open("", "_blank");
+                          printWindow?.document.write(printContent.innerHTML);
+                          printWindow?.document.close();
+                          printWindow?.focus();
+                          setTimeout(() => {
+                            printWindow?.print();
+                          }, 500);
+                        }}
+                      >
+                        <Printer className="h-4 w-4 mr-1" />
+                        <span>Print History</span>
+                      </Button>
+                    </div>
                     <CardDescription>Timeline of all activities for this task</CardDescription>
                   </CardHeader>
                   <CardContent className="px-0 space-y-4">
-                    {task?.actions?.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No activities yet</p>
+                    {!task?.actions?.length ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <Clock className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                        <p className="text-sm text-muted-foreground">No activities recorded yet</p>
+                      </div>
                     ) : (
-                      <div className="space-y-4">
-                        {task?.actions?.map((action: any) => (
-                          <div
-                            key={action.id}
-                            className="border-l-2 pl-4 pb-4 relative before:absolute before:w-3 before:h-3 before:rounded-full before:bg-primary before:left-[-7px] before:top-0"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <p className="text-sm font-medium">{action.description}</p>
+                      <div className="relative space-y-0 pl-6 before:absolute before:inset-y-0 before:left-2 before:w-[2px] before:bg-border">
+                        {task?.actions?.map((action: TaskAction, index: number) => {
+                          // Determine action type icon
+                          let ActionIcon = MessageCircle;
+                          let iconColorClass = "text-blue-500 bg-blue-50";
+
+                          if (action.description.includes("Status changed")) {
+                            ActionIcon = RotateCw;
+
+                            if (action.newStatus === "IN_PROGRESS") {
+                              iconColorClass = "text-amber-500 bg-amber-50";
+                            } else if (action.newStatus === "DONE") {
+                              ActionIcon = CheckCircle;
+                              iconColorClass = "text-green-500 bg-green-50";
+                            }
+                          } else if (action.description.includes("created")) {
+                            ActionIcon = Circle;
+                            iconColorClass = "text-purple-500 bg-purple-50";
+                          }
+
+                          return (
+                            <div
+                              key={action.id}
+                              className={`relative pb-8 ${index === task.actions.length - 1 ? "pb-0" : ""}`}
+                            >
+                              <div className="absolute left-[-24px] mt-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white">
+                                <div
+                                  className={`flex h-4 w-4 items-center justify-center rounded-full ${iconColorClass}`}
+                                >
+                                  <ActionIcon className="h-2.5 w-2.5" />
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col rounded-lg border bg-card p-3 text-card-foreground shadow-sm">
+                                <div className="flex items-start justify-between mb-1">
+                                  <span className="font-medium text-sm">{action.description}</span>
+                                  <span className="text-xs text-muted-foreground flex items-center whitespace-nowrap">
+                                    <Clock className="h-3 w-3 mr-1 inline" />
+                                    {format(new Date(action.createdAt), "MMM d, HH:mm")}
+                                  </span>
+                                </div>
+
                                 {action.oldStatus && action.newStatus && (
-                                  <div className="flex items-center mt-1 text-xs text-muted-foreground">
-                                    <Badge
-                                      variant="outline"
-                                      className="mr-2 text-xs"
-                                    >
-                                      {action.oldStatus}
-                                    </Badge>
-                                    <span className="mx-1">→</span>
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      {action.newStatus}
-                                    </Badge>
+                                  <div className="flex items-center my-1.5 text-xs">
+                                    <div className="flex-1 flex items-center">
+                                      <Badge
+                                        variant="outline"
+                                        className={`mr-2 text-xs ${
+                                          action.oldStatus === "PENDING"
+                                            ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                            : action.oldStatus === "IN_PROGRESS"
+                                            ? "bg-blue-100 text-blue-800 border-blue-200"
+                                            : "bg-green-100 text-green-800 border-green-200"
+                                        }`}
+                                      >
+                                        {action.oldStatus === "PENDING"
+                                          ? "To Do"
+                                          : action.oldStatus === "IN_PROGRESS"
+                                          ? "In Progress"
+                                          : "Completed"}
+                                      </Badge>
+
+                                      <ArrowRight className="h-3 w-3 text-muted-foreground mx-1" />
+
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-xs ${
+                                          action.newStatus === "PENDING"
+                                            ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                            : action.newStatus === "IN_PROGRESS"
+                                            ? "bg-blue-100 text-blue-800 border-blue-200"
+                                            : "bg-green-100 text-green-800 border-green-200"
+                                        }`}
+                                      >
+                                        {action.newStatus === "PENDING"
+                                          ? "To Do"
+                                          : action.newStatus === "IN_PROGRESS"
+                                          ? "In Progress"
+                                          : "Completed"}
+                                      </Badge>
+                                    </div>
                                   </div>
                                 )}
+
                                 {action.note && (
-                                  <p className="mt-2 text-sm bg-slate-50 p-2 rounded-md">{action.note}</p>
+                                  <div className="mt-1.5 text-sm p-2 bg-muted/50 rounded-md">
+                                    <p className="text-muted-foreground">{action.note}</p>
+                                  </div>
                                 )}
+
+                                <div className="flex items-center mt-2 pt-1.5 border-t text-xs text-muted-foreground">
+                                  <Avatar className="h-5 w-5 mr-1.5">
+                                    <AvatarFallback className="text-[10px]">
+                                      {action.user.name
+                                        .split(" ")
+                                        .map((n: string) => n[0])
+                                        .join("")}
+                                    </AvatarFallback>
+                                    <AvatarImage
+                                      src={`https://avatar.vercel.sh/${action.user.id}?size=32`}
+                                      alt={action.user.name}
+                                    />
+                                  </Avatar>
+                                  <span>{action.user.name}</span>
+                                </div>
                               </div>
-                              <span className="text-xs text-muted-foreground">
-                                {format(new Date(action.createdAt), "MMM d, HH:mm")}
-                              </span>
                             </div>
-                            <div className="flex items-center mt-1">
-                              <Avatar className="w-5 h-5">
-                                <AvatarFallback className="text-[10px]">
-                                  {action.user.name
-                                    .split(" ")
-                                    .map((n: string) => n[0])
-                                    .join("")}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-xs ml-1 text-muted-foreground">{action.user.name}</span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>

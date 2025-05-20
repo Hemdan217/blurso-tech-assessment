@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Archive, Edit, Trash, Layers, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Project type definition
 export interface Project {

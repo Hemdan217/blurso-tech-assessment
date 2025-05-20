@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSession } from "next-auth/react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Spinner } from "@/components/ui/spinner";
 
 // Define the form schema with Zod
 const registerSchema = z
@@ -55,7 +56,8 @@ const registerSchema = z
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-export default function RegisterPage() {
+// Component that handles the registration form
+function RegisterForm() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +129,13 @@ export default function RegisterPage() {
   if (status === "loading") {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <p>Loading...</p>
+        <div className="text-center space-y-4">
+          <Spinner
+            size="lg"
+            variant="primary"
+          />
+          <p className="text-primary font-medium animate-pulse-fade">Loading your account...</p>
+        </div>
       </div>
     );
   }
@@ -308,5 +316,26 @@ export default function RegisterPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+// Main page component with Suspense
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center items-center min-h-screen">
+          <div className="text-center space-y-4">
+            <Spinner
+              size="lg"
+              variant="primary"
+            />
+            <p className="text-primary font-medium animate-pulse-fade">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }
