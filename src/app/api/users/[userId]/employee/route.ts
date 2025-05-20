@@ -2,14 +2,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
-type RouteParams = {
-  params: {
-    userId: string;
-  };
-};
-
-export async function GET(request: NextRequest, { params }: RouteParams) {
+// Define the route handler using the standard Next.js App Router pattern
+export async function GET(request: NextRequest, context: { params: { userId: string } }) {
   try {
+    const { userId } = context.params;
     const session = await auth();
 
     // Ensure user is authenticated
@@ -18,13 +14,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Only allow users to access their own employee data or admins to access any
-    if (session.user.id !== params.userId && session.user.role !== "ADMIN") {
+    if (session.user.id !== userId && session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Find employee record
     const employee = await prisma.employee.findFirst({
-      where: { userId: params.userId },
+      where: { userId },
       select: { id: true },
     });
 
